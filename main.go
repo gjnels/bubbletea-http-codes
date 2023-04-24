@@ -9,28 +9,29 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-const url = "https://vaporficolumbus.vercel.app/"
+var url string
 
 type model struct {
 	status int
 	err    error
 }
 
-func checkServer() tea.Msg {
+func checkServer(url string) tea.Cmd {
+	return func() tea.Msg {
+		// create an HTTP client and make a GET request
+		c := &http.Client{Timeout: 10 * time.Second}
+		res, err := c.Get(url)
 
-	// create an HTTP client and make a GET request
-	c := &http.Client{Timeout: 10 * time.Second}
-	res, err := c.Get(url)
+		if err != nil {
+			// there was an error making our request
+			// wrap the error we received in a message and return it
+			return errMsg{err}
+		}
 
-	if err != nil {
-		// there was an error making our request
-		// wrap the error we received in a message and return it
-		return errMsg{err}
+		// we received a response from the server
+		// return the HTTP status code as a message
+		return statusMsg(res.StatusCode)
 	}
-
-	// we received a response from the server
-	// return the HTTP status code as a message
-	return statusMsg(res.StatusCode)
 }
 
 type statusMsg int
@@ -41,7 +42,12 @@ type errMsg struct{ err error }
 func (e errMsg) Error() string { return e.err.Error() }
 
 func (m model) Init() tea.Cmd {
-	return checkServer
+	if len(os.Args) <= 1 {
+		fmt.Println("You must enter a URL to check")
+		os.Exit(1)
+	}
+	url = os.Args[1]
+	return checkServer(url)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
